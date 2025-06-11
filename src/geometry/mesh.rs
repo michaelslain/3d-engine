@@ -40,22 +40,6 @@ impl Mesh {
         vertices
     }
 
-    pub fn get_visible_vertices(&self) -> Vec<Vec3> {
-        let mut vertices = Vec::new();
-        for triangle in &self.triangles {
-            if triangle.get_normal().z < 0.0 {
-                let [v0, v1, v2] = triangle.get_vertices();
-                vertices.push(v0);
-                vertices.push(v1);
-                vertices.push(v1);
-                vertices.push(v2);
-                vertices.push(v2);
-                vertices.push(v0);
-            }
-        }
-        vertices
-    }
-
     pub fn get_triangles(&self) -> &Vec<Triangle> {
         &self.triangles
     }

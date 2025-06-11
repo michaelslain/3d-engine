@@ -17,7 +17,7 @@ impl Triangle {
     }
 
     fn calculate_normal(&mut self) {
-        let a = self.vertices[1] - self.vertices[0];
+        let a: Vec3 = self.vertices[1] - self.vertices[0];
         let b = self.vertices[2] - self.vertices[0];
 
         let normal = a.cross(b);

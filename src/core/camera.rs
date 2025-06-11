@@ -6,6 +6,7 @@ use std::f32::consts::PI;
 
 #[derive(Clone)]
 pub struct Camera {
+    position: Vec3,
     near: f32, // distance from camera to near plane (1.0)
     far: f32,  // distance from camera to far plane (10.0)
 }
@@ -13,6 +14,7 @@ pub struct Camera {
 impl Camera {
     pub fn new() -> Self {
         let camera = Self {
+            position: Vec3::ZERO,
             near: 1.0, // Standard near plane at 1.0
             far: 10.0, // Standard far plane at 10.0
         };
@@ -50,17 +52,35 @@ impl Camera {
         Triangle::new(projected_vertices)
     }
 
-    pub fn project_mesh(&self, mesh: Mesh) -> Mesh {
-        let triangles = mesh
-            .get_triangles()
-            .into_iter()
-            .map(|triangle| self.project_triangle(triangle.clone()))
-            .collect();
-        Mesh::new(triangles)
+    // pub fn project_mesh(&self, mesh: Mesh) -> Mesh {
+    //     let triangles = mesh
+    //         .get_triangles()
+    //         .into_iter()
+    //         .map(|triangle| self.project_triangle(triangle.clone()))
+    //         .collect();
+    //     Mesh::new(triangles)
+    // }
+
+    // pub fn project_object(&self, object: &Object) -> Mesh {
+    //     let mesh = Mesh::new(object.transformed_triangles());
+    //     self.project_mesh(mesh)
+    // }
+
+    pub fn get_position(&self) -> Vec3 {
+        self.position
     }
 
-    pub fn project_object(&self, object: &Object) -> Mesh {
-        let mesh = Mesh::new(object.transformed_triangles());
-        self.project_mesh(mesh)
+    pub fn set_position(&mut self, position: Vec3) {
+        self.position = position;
     }
+
+    // pub fn project_transformed_triangle(&self, object: &Object, triangle: &Triangle) -> Triangle {
+    //     let vertices = triangle.get_vertices();
+    //     let projected_vertices = [
+    //         self.project_point(vertices[0]),
+    //         self.project_point(vertices[1]),
+    //         self.project_point(vertices[2]),
+    //     ];
+    //     Triangle::new(projected_vertices)
+    // }
 }

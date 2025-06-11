@@ -35,11 +35,10 @@ fn main() {
     ]));
 
     cube1.set_position(Vec3::new(1.0, 0.0, 3.0));
-    cube1.set_rotation(Vec3::new(10.0, 1.0, 2.0));
 
     cube1.set_update(|obj, dt| {
         let rot = obj.get_rotation();
-        obj.set_rotation(*rot + Vec3::new(0.0, dt, 0.0));
+        obj.set_rotation(*rot + Vec3::new(dt, dt, dt));
     });
 
     let mut cube2: Object = Object::new(Mesh::from_raw_coordinates(vec![
@@ -63,12 +62,11 @@ fn main() {
         [-0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5], // Triangle 12
     ]));
 
-    cube2.set_position(Vec3::new(-1.0, 0.0, 4.0));
-    cube2.set_rotation(Vec3::new(0.0, 0.0, 0.0));
+    cube2.set_position(Vec3::new(-3.0, 0.0, 4.0));
 
     cube2.set_update(|obj, dt| {
-        let rot = obj.get_rotation();
-        obj.set_rotation(*rot + Vec3::new(dt, 0.0, 0.0));
+        let rot: &Vec3 = obj.get_rotation();
+        obj.set_rotation(*rot + Vec3::new(dt, dt, dt));
     });
 
     scene.add_object(cube1);

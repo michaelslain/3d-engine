@@ -1,4 +1,5 @@
 use crate::geometry::mesh::Mesh;
+use crate::geometry::triangle::Triangle;
 use glam::{Mat3, Vec3};
 
 pub struct Object {
@@ -32,26 +33,19 @@ impl Object {
         }
     }
 
-    pub fn transformed_triangles(&self) -> Vec<crate::geometry::triangle::Triangle> {
+    pub fn transformed_triangle(&self, triangle: Triangle) -> Triangle {
+        let vertices = triangle.get_vertices();
         let rotate_matrix_x = Mat3::from_rotation_x(self.rotation.x);
         let rotate_matrix_y = Mat3::from_rotation_y(self.rotation.y);
         let rotate_matrix_z = Mat3::from_rotation_z(self.rotation.z);
 
-        // Combine rotation matrices
-        let rotation = rotate_matrix_z * rotate_matrix_y * rotate_matrix_x;
+        let rotation: Mat3 = rotate_matrix_z * rotate_matrix_y * rotate_matrix_x;
 
-        self.mesh
-            .get_triangles()
-            .iter()
-            .map(|tri| {
-                let vertices = tri.get_vertices();
-                crate::geometry::triangle::Triangle::new([
-                    rotation * vertices[0] + self.position,
-                    rotation * vertices[1] + self.position,
-                    rotation * vertices[2] + self.position,
-                ])
-            })
-            .collect()
+        crate::geometry::triangle::Triangle::new([
+            rotation * vertices[0] + self.position,
+            rotation * vertices[1] + self.position,
+            rotation * vertices[2] + self.position,
+        ])
     }
 
     pub fn get_mesh(&self) -> &Mesh {
