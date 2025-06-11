@@ -41,35 +41,26 @@ impl Camera {
     }
 
     pub fn project_triangle(&self, triangle: Triangle) -> Triangle {
-        Triangle {
-            vertices: [
-                self.project_point(triangle.vertices[0]),
-                self.project_point(triangle.vertices[1]),
-                self.project_point(triangle.vertices[2]),
-            ],
-        }
+        let vertices = triangle.get_vertices();
+        let projected_vertices = [
+            self.project_point(vertices[0]),
+            self.project_point(vertices[1]),
+            self.project_point(vertices[2]),
+        ];
+        Triangle::new(projected_vertices)
     }
 
     pub fn project_mesh(&self, mesh: Mesh) -> Mesh {
-        Mesh {
-            triangles: mesh
-                .triangles
-                .into_iter()
-                .map(|triangle| self.project_triangle(triangle))
-                .collect(),
-        }
+        let triangles = mesh
+            .get_triangles()
+            .into_iter()
+            .map(|triangle| self.project_triangle(triangle.clone()))
+            .collect();
+        Mesh::new(triangles)
     }
 
     pub fn project_object(&self, object: &Object) -> Mesh {
-        let mut projected_mesh = Mesh::from_raw_coordinates(Vec::new());
-        for triangle in object.transformed_triangles() {
-            let v0 = self.project_point(triangle.vertices[0]);
-            let v1 = self.project_point(triangle.vertices[1]);
-            let v2 = self.project_point(triangle.vertices[2]);
-            projected_mesh.triangles.push(Triangle {
-                vertices: [v0, v1, v2],
-            });
-        }
-        projected_mesh
+        let mesh = Mesh::new(object.transformed_triangles());
+        self.project_mesh(mesh)
     }
 }

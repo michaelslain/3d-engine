@@ -41,14 +41,15 @@ impl Object {
         let rotation = rotate_matrix_z * rotate_matrix_y * rotate_matrix_x;
 
         self.mesh
-            .triangles
+            .get_triangles()
             .iter()
-            .map(|tri| crate::geometry::triangle::Triangle {
-                vertices: [
-                    rotation * tri.vertices[0] + self.position,
-                    rotation * tri.vertices[1] + self.position,
-                    rotation * tri.vertices[2] + self.position,
-                ],
+            .map(|tri| {
+                let vertices = tri.get_vertices();
+                crate::geometry::triangle::Triangle::new([
+                    rotation * vertices[0] + self.position,
+                    rotation * vertices[1] + self.position,
+                    rotation * vertices[2] + self.position,
+                ])
             })
             .collect()
     }
