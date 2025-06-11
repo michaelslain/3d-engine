@@ -1,6 +1,6 @@
 use crate::core::object::Object;
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct Scene {
     objects: Vec<Object>,
 }

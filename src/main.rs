@@ -37,6 +37,11 @@ fn main() {
     cube.set_position(Vec3::new(1.0, 0.0, 3.0));
     cube.set_rotation(Vec3::new(0.0, 0.0, 2.0));
 
+    cube.set_update(|obj, dt| {
+        let rot = obj.get_rotation();
+        obj.set_rotation(*rot + Vec3::new(0.0, dt, 0.0));
+    });
+
     scene.add_object(cube);
 
     let camera = Camera::new();

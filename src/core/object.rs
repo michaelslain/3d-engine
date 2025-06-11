@@ -1,11 +1,11 @@
 use crate::geometry::mesh::Mesh;
 use glam::{Mat3, Vec3};
 
-#[derive(Clone)]
 pub struct Object {
     mesh: Mesh,
     position: Vec3,
     rotation: Vec3,
+    update: Option<Box<dyn FnMut(&mut Self, f32)>>,
 }
 
 impl Object {
@@ -14,10 +14,44 @@ impl Object {
             mesh,
             position: Vec3::ZERO,
             rotation: Vec3::ZERO,
+            update: None,
         }
     }
 
-    pub fn update(&mut self, delta_time: f32) {}
+    pub fn set_update<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut Self, f32) + 'static,
+    {
+        self.update = Some(Box::new(f));
+    }
+
+    pub fn update(&mut self, delta_time: f32) {
+        if let Some(mut f) = self.update.take() {
+            f(self, delta_time);
+            self.update = Some(f);
+        }
+    }
+
+    pub fn transformed_triangles(&self) -> Vec<crate::geometry::triangle::Triangle> {
+        let rotate_matrix_x = Mat3::from_rotation_x(self.rotation.x);
+        let rotate_matrix_y = Mat3::from_rotation_y(self.rotation.y);
+        let rotate_matrix_z = Mat3::from_rotation_z(self.rotation.z);
+
+        // Combine rotation matrices
+        let rotation = rotate_matrix_z * rotate_matrix_y * rotate_matrix_x;
+
+        self.mesh
+            .triangles
+            .iter()
+            .map(|tri| crate::geometry::triangle::Triangle {
+                vertices: [
+                    rotation * tri.vertices[0] + self.position,
+                    rotation * tri.vertices[1] + self.position,
+                    rotation * tri.vertices[2] + self.position,
+                ],
+            })
+            .collect()
+    }
 
     pub fn get_mesh(&self) -> &Mesh {
         &self.mesh
@@ -41,26 +75,5 @@ impl Object {
 
     pub fn set_rotation(&mut self, rotation: Vec3) {
         self.rotation = rotation;
-    }
-
-    pub fn transformed_triangles(&self) -> Vec<crate::geometry::triangle::Triangle> {
-        let rotate_matrix_x = Mat3::from_rotation_x(self.rotation.x);
-        let rotate_matrix_y = Mat3::from_rotation_y(self.rotation.y);
-        let rotate_matrix_z = Mat3::from_rotation_z(self.rotation.z);
-
-        // Combine rotation matrices
-        let rotation = rotate_matrix_z * rotate_matrix_y * rotate_matrix_x;
-
-        self.mesh
-            .triangles
-            .iter()
-            .map(|tri| crate::geometry::triangle::Triangle {
-                vertices: [
-                    rotation * tri.vertices[0] + self.position,
-                    rotation * tri.vertices[1] + self.position,
-                    rotation * tri.vertices[2] + self.position,
-                ],
-            })
-            .collect()
     }
 }
