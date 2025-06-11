@@ -1,0 +1,11 @@
+[package]
+name = "three-d"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+glam = "0.30.3"
+pollster = "0.4.0"
+wgpu = "25.0.2"
+winit = "0.30.11"
+bytemuck = { version = "1.15.0", features = ["derive"] }

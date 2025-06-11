@@ -1,0 +1,5 @@
+// Vertex shader for line rendering
+@vertex
+fn vs_main(@location(0) pos: vec3<f32>) -> @builtin(position) vec4<f32> {
+    return vec4(pos, 1.0);
+} 
