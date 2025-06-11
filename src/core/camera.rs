@@ -62,10 +62,10 @@ impl Camera {
 
     pub fn project_object(&self, object: &Object) -> Mesh {
         let mut projected_mesh = Mesh::from_raw_coordinates(Vec::new());
-        for triangle in object.get_mesh().triangles.iter() {
-            let v0 = self.project_point(triangle.vertices[0] + object.get_position());
-            let v1 = self.project_point(triangle.vertices[1] + object.get_position());
-            let v2 = self.project_point(triangle.vertices[2] + object.get_position());
+        for triangle in object.transformed_triangles() {
+            let v0 = self.project_point(triangle.vertices[0]);
+            let v1 = self.project_point(triangle.vertices[1]);
+            let v2 = self.project_point(triangle.vertices[2]);
             projected_mesh.triangles.push(Triangle {
                 vertices: [v0, v1, v2],
             });

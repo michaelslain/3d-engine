@@ -34,7 +34,8 @@ fn main() {
         [-0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5], // Triangle 12
     ]));
 
-    cube.set_position(Vec3::new(0.0, 0.0, 10.0));
+    cube.set_position(Vec3::new(1.0, 0.0, 3.0));
+    cube.set_rotation(Vec3::new(0.0, 0.0, 2.0));
 
     scene.add_object(cube);
 

@@ -2,6 +2,7 @@ use crate::core::camera::Camera;
 use crate::scene::Scene;
 use bytemuck;
 use std::sync::Arc;
+use std::time::Instant;
 use wgpu;
 use winit::{
     event::{Event, WindowEvent},
@@ -20,6 +21,7 @@ pub struct Renderer {
     vertex_buffer: Option<wgpu::Buffer>,
     vertex_capacity: usize,
     render_pipeline: wgpu::RenderPipeline,
+    last_frame_time: Instant,
 }
 
 impl Renderer {
@@ -126,12 +128,19 @@ impl Renderer {
                 vertex_buffer: None,
                 vertex_capacity: 0,
                 render_pipeline,
+                last_frame_time: Instant::now(),
             },
             event_loop,
         )
     }
 
     pub fn render(&mut self) {
+        let now = Instant::now();
+        let delta_time = (now - self.last_frame_time).as_secs_f32();
+        self.last_frame_time = now;
+
+        self.scene.update(delta_time);
+
         let frame = self.surface.get_current_texture().unwrap();
         let view = frame
             .texture
