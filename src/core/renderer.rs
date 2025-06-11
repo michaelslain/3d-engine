@@ -154,15 +154,15 @@ impl Renderer {
         let mut vertices: Vec<[f32; 3]> = Vec::new();
         for object in self.scene.get_objects() {
             let projected_mesh = self.camera.project_object(object);
-            let mesh_vertices = projected_mesh.get_vertices();
+            let mesh_vertices = projected_mesh.get_visible_vertices();
             vertices.extend(mesh_vertices.iter().map(|v| [v.x, v.y, v.z]));
         }
-        for (i, v) in vertices.iter().take(6).enumerate() {
-            println!(
-                "Projected vertex {}: [{:.2}, {:.2}, {:.2}]",
-                i, v[0], v[1], v[2]
-            );
-        }
+        // for (i, v) in vertices.iter().take(6).enumerate() {
+        //     println!(
+        //         "Projected vertex {}: [{:.2}, {:.2}, {:.2}]",
+        //         i, v[0], v[1], v[2]
+        //     );
+        // }
         if vertices.is_empty() {
             println!("No triangles to draw.");
         }
