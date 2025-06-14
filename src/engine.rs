@@ -1,6 +1,6 @@
 use crate::core::camera::Camera;
 use crate::core::renderer::Renderer;
-use crate::scene::Scene;
+use crate::core::scene::Scene;
 use pollster::block_on;
 
 pub struct Engine {

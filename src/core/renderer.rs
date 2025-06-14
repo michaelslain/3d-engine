@@ -1,5 +1,5 @@
 use crate::core::camera::Camera;
-use crate::scene::Scene;
+use crate::core::scene::Scene;
 use bytemuck;
 use std::sync::Arc;
 use std::time::Instant;
@@ -21,6 +21,8 @@ pub struct Renderer {
     vertex_buffer: Option<wgpu::Buffer>,
     vertex_capacity: usize,
     render_pipeline: wgpu::RenderPipeline,
+    light_buffer: wgpu::Buffer,
+    light_bind_group: wgpu::BindGroup,
     last_frame_time: Instant,
 }
 
@@ -28,14 +30,18 @@ impl Renderer {
     pub async fn new(scene: Scene, camera: Camera) -> (Self, EventLoop<()>) {
         let event_loop = EventLoop::new().unwrap();
         let window = event_loop
-            .create_window(Window::default_attributes())
+            .create_window(
+                Window::default_attributes()
+                    .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
+                    .with_visible(true),
+            )
             .unwrap();
         window.set_title("3D Engine");
 
         let size = window.inner_size();
         let window = Arc::new(window);
         let instance = wgpu::Instance::default();
-        let surface = instance.create_surface(window.clone()).unwrap();
+        let surface = unsafe { instance.create_surface(window.clone()).unwrap() };
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -56,20 +62,71 @@ impl Renderer {
             .await
             .unwrap();
 
-        let config = surface
-            .get_default_config(&adapter, size.width, size.height)
-            .unwrap();
+        let surface_caps = surface.get_capabilities(&adapter);
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_caps.formats[0],
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
         surface.configure(&device, &config);
 
-        // Create vertex buffer layout
-        let vertex_buffer_layout = wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<[f32; 3]>() as u64,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[wgpu::VertexAttribute {
-                offset: 0,
-                shader_location: 0,
-                format: wgpu::VertexFormat::Float32x3,
+        // Create light buffer
+        let light_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Light Buffer"),
+            size: std::mem::size_of::<[f32; 8]>() as u64, // Changed from 7 to 8 to match shader expectation (32 bytes)
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // Create bind group layout for light
+        let light_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Light Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        // Create bind group for light
+        let light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Light Bind Group"),
+            layout: &light_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: light_buffer.as_entire_binding(),
             }],
+        });
+
+        // Create vertex buffer layout with normals
+        let vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<[f32; 6]>() as u64, // 3 for position, 3 for normal
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                // Position attribute
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                // Normal attribute
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 3]>() as u64,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+            ],
         };
 
         // Create shader modules
@@ -82,10 +139,18 @@ impl Renderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/line.frag.wgsl").into()),
         });
 
+        // Create pipeline layout
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[&light_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
         // Create render pipeline
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Line Pipeline"),
-            layout: None,
+            layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &vs_module,
                 entry_point: Some("vs_main"),
@@ -116,6 +181,7 @@ impl Renderer {
             multiview: None,
             cache: None,
         });
+
         (
             Renderer {
                 device,
@@ -128,6 +194,8 @@ impl Renderer {
                 vertex_buffer: None,
                 vertex_capacity: 0,
                 render_pipeline,
+                light_buffer,
+                light_bind_group,
                 last_frame_time: Instant::now(),
             },
             event_loop,
@@ -141,7 +209,10 @@ impl Renderer {
 
         self.scene.update(delta_time);
 
-        let frame = self.surface.get_current_texture().unwrap();
+        let frame = match self.surface.get_current_texture() {
+            Ok(frame) => frame,
+            Err(_) => return, // Skip rendering if surface is invalid
+        };
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -150,12 +221,27 @@ impl Renderer {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
+        // Update light data
+        if let Some(light) = self.scene.get_lights().first() {
+            let light_data = [
+                light.get_direction().x,
+                light.get_direction().y,
+                light.get_direction().z,
+                0.0, // Padding to align to 32 bytes
+                light.get_color().x,
+                light.get_color().y,
+                light.get_color().z,
+                light.get_intensity(),
+            ];
+            self.queue
+                .write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&light_data));
+        }
+
         // --- Projected triangle edges from scene ---
-        let mut vertices: Vec<[f32; 3]> = Vec::new();
+        let mut vertices: Vec<[f32; 6]> = Vec::new(); // [x, y, z, nx, ny, nz]
         for object in self.scene.get_objects() {
             for tri in object.get_mesh().get_triangles() {
-                let transformed_tri: crate::geometry::triangle::Triangle =
-                    object.transformed_triangle(tri.clone());
+                let transformed_tri = object.transformed_triangle(tri.clone());
 
                 // culling
                 if transformed_tri
@@ -167,26 +253,27 @@ impl Renderer {
                 }
 
                 // projection
-                let projected_tri = self.camera.project_triangle(transformed_tri);
+                let projected_tri = self.camera.project_triangle(transformed_tri.clone());
                 let [v0, v1, v2] = projected_tri.get_vertices();
-                // Add triangle vertices
-                vertices.push([v0.x, v0.y, v0.z]);
-                vertices.push([v1.x, v1.y, v1.z]);
-                vertices.push([v2.x, v2.y, v2.z]);
+                let normal = transformed_tri.get_normal();
+
+                // Add triangle vertices with normals
+                vertices.push([v0.x, v0.y, v0.z, normal.x, normal.y, normal.z]);
+                vertices.push([v1.x, v1.y, v1.z, normal.x, normal.y, normal.z]);
+                vertices.push([v2.x, v2.y, v2.z, normal.x, normal.y, normal.z]);
             }
         }
-        // for (i, v) in vertices.iter().take(6).enumerate() {
-        //     println!(
-        //         "Projected vertex {}: [{:.2}, {:.2}, {:.2}]",
-        //         i, v[0], v[1], v[2]
-        //     );
-        // }
+
         if vertices.is_empty() {
-            println!("No triangles to draw.");
+            // Skip rendering if there are no vertices
+            self.queue.submit(Some(encoder.finish()));
+            frame.present();
+            return;
         }
+
         // --- Dynamic vertex buffer allocation ---
         let needed_capacity = vertices.len();
-        let needed_bytes = std::mem::size_of::<[f32; 3]>() * needed_capacity;
+        let needed_bytes = std::mem::size_of::<[f32; 6]>() * needed_capacity;
         if self.vertex_buffer.is_none() || self.vertex_capacity < needed_capacity {
             self.vertex_buffer = Some(self.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Line Vertex Buffer"),
@@ -200,7 +287,6 @@ impl Renderer {
             self.queue
                 .write_buffer(buffer, 0, bytemuck::cast_slice(&vertices));
         }
-        // --- End projected edges ---
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -222,10 +308,12 @@ impl Renderer {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
             if let Some(buffer) = &self.vertex_buffer {
                 render_pass.set_pipeline(&self.render_pipeline);
+                render_pass.set_bind_group(0, &self.light_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, buffer.slice(..));
-                render_pass.draw(0..vertices.len() as u32, 0..1); // Draw all lines
+                render_pass.draw(0..vertices.len() as u32, 0..1);
             }
         }
 
@@ -249,16 +337,17 @@ impl Renderer {
 impl winit::application::ApplicationHandler<()> for Renderer {
     fn window_event(
         &mut self,
-        _event_loop: &ActiveEventLoop,
+        event_loop: &ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                _event_loop.exit();
+                event_loop.exit();
             }
             WindowEvent::Resized(physical_size) => {
                 self.resize(physical_size.width, physical_size.height);
+                self.window.request_redraw();
             }
             WindowEvent::RedrawRequested => {
                 self.render();
@@ -272,6 +361,6 @@ impl winit::application::ApplicationHandler<()> for Renderer {
     }
 
     fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
-        // Application was resumed, nothing special needed
+        self.window.request_redraw();
     }
 }
