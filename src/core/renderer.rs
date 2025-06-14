@@ -103,7 +103,7 @@ impl Renderer {
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineList,
+                topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
@@ -166,15 +166,13 @@ impl Renderer {
                     continue;
                 }
 
+                // projection
                 let projected_tri = self.camera.project_triangle(transformed_tri);
                 let [v0, v1, v2] = projected_tri.get_vertices();
-                // Add edges of the triangle
+                // Add triangle vertices
                 vertices.push([v0.x, v0.y, v0.z]);
                 vertices.push([v1.x, v1.y, v1.z]);
-                vertices.push([v1.x, v1.y, v1.z]);
                 vertices.push([v2.x, v2.y, v2.z]);
-                vertices.push([v2.x, v2.y, v2.z]);
-                vertices.push([v0.x, v0.y, v0.z]);
             }
         }
         // for (i, v) in vertices.iter().take(6).enumerate() {
